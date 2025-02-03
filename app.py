@@ -69,9 +69,13 @@ if st.button("解析開始"):
         if len(x_data) != len(y_data):
             st.error("エラー: 広告費と売上のデータ数が一致しません。")
         else:
+            # 入力データを DataFrame にまとめて表示
+            df_input = pd.DataFrame({
+                "広告費 (円)": x_data,
+                "売上 (円)": y_data
+            })
             st.subheader("入力データ")
-            st.write("広告費 (円):", x_data)
-            st.write("売上 (円):", y_data)
+            st.table(df_input)
             
             # 広告費最適化の探索範囲と初期値
             ad_bounds = [(1, 2_000_000)]
