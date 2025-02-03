@@ -251,7 +251,7 @@ if st.button("解析開始"):
                     st.error("利益最大化の計算が収束しませんでした。")
                 
                 # -------------------------------
-                # グラフ描画（最適表示用に調整）
+                # グラフ描画（0以下の値は表示しないよう軸下限を0に設定）
                 # -------------------------------
                 x_plot = np.linspace(1, 500000, 300)
                 y_pred = model_func(x_plot, a, b, c)
@@ -278,6 +278,8 @@ if st.button("解析開始"):
                 axes[0].set_xlabel('Ad Cost (×10k JPY)')
                 axes[0].set_ylabel('Sales (×10k JPY)')
                 axes[0].legend()
+                axes[0].set_xlim(0, max(x_plot_10k)*1.05)
+                axes[0].set_ylim(0, max(y_pred_10k)*1.1)
                 
                 # ② 広告費 vs 利益
                 axes[1].plot(x_plot_10k, profit_pred_10k, color='red', label='Predicted Profit')
@@ -287,6 +289,8 @@ if st.button("解析開始"):
                 axes[1].set_xlabel('Ad Cost (×10k JPY)')
                 axes[1].set_ylabel('Profit (×10k JPY)')
                 axes[1].legend()
+                axes[1].set_xlim(0, max(x_plot_10k)*1.05)
+                axes[1].set_ylim(0, max(profit_pred_10k)*1.1)
                 
                 # ③ 広告費 vs ROAS
                 axes[2].plot(x_plot_10k, roas_pred, color='red', label='Predicted ROAS')
@@ -296,8 +300,9 @@ if st.button("解析開始"):
                 axes[2].set_xlabel('Ad Cost (×10k JPY)')
                 axes[2].set_ylabel('ROAS (%)')
                 axes[2].legend()
+                axes[2].set_xlim(0, max(x_plot_10k)*1.05)
+                axes[2].set_ylim(0, max(roas_pred)*1.1)
                 
-                # st.pyplot に use_container_width オプションを付加
                 st.pyplot(fig, use_container_width=True)
             
     except Exception as e:
