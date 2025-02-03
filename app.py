@@ -5,6 +5,11 @@ from scipy.optimize import curve_fit, minimize
 import pandas as pd
 import re
 import warnings
+import matplotlib
+
+# 日本語フォントの設定（環境に合わせてフォント名を変更してください）
+matplotlib.rcParams["font.family"] = "IPAexGothic"  # 例：IPAexGothic
+matplotlib.rcParams["axes.unicode_minus"] = False    # 負の数のマイナス記号が文字化けしないように
 
 # 不要な警告を抑制
 warnings.filterwarnings("ignore")
