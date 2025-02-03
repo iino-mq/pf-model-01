@@ -95,7 +95,7 @@ if st.button("解析開始"):
                 optimal_x = None  # 最適解なし
             
             # -------------------------------
-            # 3. グラフ描画
+            # 3. Graph Drawing (with English labels)
             # -------------------------------
             # 描画用 x 軸の範囲 (円単位)
             x_plot = np.linspace(1, 500000, 300)
@@ -111,38 +111,38 @@ if st.button("解析開始"):
             y_data_10k = y_data / 10000.0
             optimal_x_10k = None if optimal_x is None else (optimal_x / 10000.0)
             
-            # matplotlib による 3 つのサブプロットの描画
+            # matplotlib による 3 つのサブプロットの描画（英語表記）
             fig, axes = plt.subplots(1, 3, figsize=(21, 7))
             
-            # ① 広告費 vs. 売上
-            axes[0].scatter(x_data_10k, y_data_10k, color='blue', label='観測データ')
-            axes[0].plot(x_plot_10k, y_pred_10k, color='red', label='フィットしたログモデル')
+            # ① Ad Cost vs Sales
+            axes[0].scatter(x_data_10k, y_data_10k, color='blue', label='Observed Data')
+            axes[0].plot(x_plot_10k, y_pred_10k, color='red', label='Fitted Log Model')
             if optimal_x_10k is not None:
-                axes[0].axvline(optimal_x_10k, color='green', linestyle='--', label='最適な広告費')
-            axes[0].set_title('広告費 vs 売上 (10k JPY)')
-            axes[0].set_xlabel('広告費 (×10k JPY)')
-            axes[0].set_ylabel('売上 (×10k JPY)')
+                axes[0].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
+            axes[0].set_title('Ad Cost vs Sales (10k JPY)')
+            axes[0].set_xlabel('Ad Cost (×10k JPY)')
+            axes[0].set_ylabel('Sales (×10k JPY)')
             axes[0].legend()
             axes[0].set_xlim(0, max(x_plot_10k)*1.05)
             axes[0].set_ylim(0, max(y_pred_10k)*1.1)
             
-            # ② 広告費 vs. 利益
-            axes[1].plot(x_plot_10k, profit_pred_10k, color='red', label='予測利益')
+            # ② Ad Cost vs Profit
+            axes[1].plot(x_plot_10k, profit_pred_10k, color='red', label='Predicted Profit')
             if optimal_x_10k is not None:
-                axes[1].axvline(optimal_x_10k, color='green', linestyle='--', label='最適な広告費')
-            axes[1].set_title('広告費 vs 利益 (10k JPY)')
-            axes[1].set_xlabel('広告費 (×10k JPY)')
-            axes[1].set_ylabel('利益 (×10k JPY)')
+                axes[1].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
+            axes[1].set_title('Ad Cost vs Profit (10k JPY)')
+            axes[1].set_xlabel('Ad Cost (×10k JPY)')
+            axes[1].set_ylabel('Profit (×10k JPY)')
             axes[1].legend()
             axes[1].set_xlim(0, max(x_plot_10k)*1.05)
             axes[1].set_ylim(0, max(profit_pred_10k)*1.1)
             
-            # ③ 広告費 vs. ROAS
-            axes[2].plot(x_plot_10k, roas_pred, color='red', label='予測ROAS')
+            # ③ Ad Cost vs ROAS
+            axes[2].plot(x_plot_10k, roas_pred, color='red', label='Predicted ROAS')
             if optimal_x_10k is not None:
-                axes[2].axvline(optimal_x_10k, color='green', linestyle='--', label='最適な広告費')
-            axes[2].set_title('広告費 vs ROAS')
-            axes[2].set_xlabel('広告費 (×10k JPY)')
+                axes[2].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
+            axes[2].set_title('Ad Cost vs ROAS')
+            axes[2].set_xlabel('Ad Cost (×10k JPY)')
             axes[2].set_ylabel('ROAS (%)')
             axes[2].legend()
             axes[2].set_xlim(0, max(x_plot_10k)*1.05)
