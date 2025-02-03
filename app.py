@@ -12,32 +12,19 @@ def log_func(x, a, b, c):
     return a * np.log(b * x) + c
 
 def quad_func(x, a, b, c):
-    """二次関数モデル: 売上 = a * x^2 + b * x + c  
-    ※ 広告費増加により飽和（あるいは下落）することを期待する場合、aは負の値となる設定を想定
-    """
+    """二次関数モデル: 売上 = a * x^2 + b * x + c"""
     return a * x**2 + b * x + c
 
 def sigmoid_func(x, a, b, c):
-    """シグモイド関数モデル: 売上 = a / (1 + exp(-b*(x - c)))  
-    ・a : 上限（最大売上）  
-    ・b : 成長の速さ  
-    ・c : 転換点（x軸上の中央値）  
-    """
+    """シグモイド関数モデル: 売上 = a / (1 + exp(-b*(x - c)))"""
     return a / (1 + np.exp(-b * (x - c)))
 
 def gompertz_func(x, a, b, c):
-    """ゴンペルツ関数モデル: 売上 = a * exp(-b * exp(-c * x))  
-    ・a : 上限（最大売上）  
-    ・b, c : 形状を決めるパラメータ
-    """
+    """ゴンペルツ関数モデル: 売上 = a * exp(-b * exp(-c * x))"""
     return a * np.exp(-b * np.exp(-c * x))
 
 def frac_func(x, a, b, c):
-    """分数関数モデル: 売上 = (a * x + b) / (x + c)  
-    ・a: xが大きいときの漸近値  
-    ・b: 分子の定数項  
-    ・c: 分母のシフト（xが小さいときの影響を調整）
-    """
+    """分数関数モデル: 売上 = (a * x + b) / (x + c)"""
     return (a * x + b) / (x + c)
 
 # -------------------------------
@@ -61,7 +48,8 @@ st.markdown("""
 # -------------------------------
 # モデル選択の入力
 # -------------------------------
-model_type = st.selectbox("モデル選択", ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"])
+model_type = st.selectbox("モデル選択", 
+                          ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"])
 
 # -------------------------------
 # 入力データの入力 (デフォルト値あり)
@@ -85,7 +73,7 @@ if st.button("解析開始"):
             st.write("広告費 (円):", x_data)
             st.write("売上 (円):", y_data)
             
-            # 広告費最適化の探索範囲
+            # 広告費最適化の探索範囲と初期値
             ad_bounds = [(1, 2_000_000)]
             initial_guess = 300000.0  # 広告費の初期値 (円)
             
@@ -93,7 +81,6 @@ if st.button("解析開始"):
             # 「全モデル比較」の場合
             # -------------------------------
             if model_type == "全モデル比較":
-                # 各モデルの設定を辞書形式でまとめる
                 models = {
                     "対数関数": {
                         "func": log_func,
@@ -122,18 +109,16 @@ if st.button("解析開始"):
                     }
                 }
                 
-                results = []  # 結果を格納するリスト
-                
+                results = []
                 for name, setting in models.items():
                     model_func = setting["func"]
                     p0 = setting["p0"]
                     param_bounds = setting["bounds"]
                     
                     try:
-                        # モデルのパラメータ推定
+                        # モデルパラメータ推定
                         params, pcov = curve_fit(model_func, x_data, y_data, p0=p0, bounds=param_bounds)
                         a, b, c = params
-                        perr = np.sqrt(np.diag(pcov))
                         
                         # 決定係数 R² の計算
                         y_model = model_func(x_data, a, b, c)
@@ -142,7 +127,7 @@ if st.button("解析開始"):
                         ss_tot = np.sum((y_data - np.mean(y_data))**2)
                         r2 = 1 - ss_res / ss_tot
                         
-                        # 利益 = 売上 - 広告費 の定義
+                        # 利益・ROAS の定義
                         profit_func = lambda x: model_func(x, a, b, c) - x
                         roas_func = lambda x: (model_func(x, a, b, c) / x) * 100
                         
@@ -159,7 +144,7 @@ if st.button("解析開始"):
                             optimal_profit = np.nan
                             optimal_roas = np.nan
                         
-                        # 円 -> 万円 への変換（表示用）
+                        # 円 -> 万円 への変換
                         optimal_x_10k = optimal_x / 10000.0
                         optimal_sales_10k = optimal_sales / 10000.0
                         optimal_profit_10k = optimal_profit / 10000.0
@@ -182,7 +167,6 @@ if st.button("解析開始"):
                             "決定係数": "計算エラー"
                         })
                 
-                # DataFrameに変換して表形式で出力
                 df_results = pd.DataFrame(results)
                 st.subheader("全モデル比較結果")
                 st.table(df_results)
@@ -191,46 +175,42 @@ if st.button("解析開始"):
             # 単一モデル選択の場合
             # -------------------------------
             else:
-                # モデルごとの設定（単一モデル用）
                 if model_type == "対数関数":
                     model_func   = log_func
                     model_name   = "対数関数モデル"
-                    p0           = [500, 1e-4, 500]  
+                    p0           = [500, 1e-4, 500]
                     param_bounds = ((1, 1e-7, 0), (1e6, 1, 1e7))
                 elif model_type == "二次関数":
                     model_func   = quad_func
                     model_name   = "二次関数モデル"
-                    p0           = [-1e-5, 3, 400000]  
+                    p0           = [-1e-5, 3, 400000]
                     param_bounds = ((-1e-4, -100, 0), (0, 10, 1e7))
                 elif model_type == "シグモイド関数":
                     model_func   = sigmoid_func
                     model_name   = "シグモイド関数モデル"
-                    p0           = [1e6, 1e-5, 200000]  
+                    p0           = [1e6, 1e-5, 200000]
                     param_bounds = ((1e5, 1e-8, 0), (1e7, 1e-3, 1e6))
                 elif model_type == "ゴンペルツ関数":
                     model_func   = gompertz_func
                     model_name   = "ゴンペルツ関数モデル"
-                    p0           = [1e6, 5, 1e-5]  
+                    p0           = [1e6, 5, 1e-5]
                     param_bounds = ((1e5, 0, 1e-8), (1e7, 10, 1e-3))
                 elif model_type == "分数関数":
                     model_func   = frac_func
                     model_name   = "分数関数モデル"
-                    p0           = [1e6, 0, 100000]  
+                    p0           = [1e6, 0, 100000]
                     param_bounds = ((1e5, -1e6, 1), (1e7, 1e6, 1e7))
                 else:
                     st.error("選択したモデルはサポートされていません。")
                     st.stop()
                 
-                # 利益・ROAS の計算（選択したモデルを利用）
+                # 利益・ROAS の計算
                 def profit_func(x, a, b, c):
-                    """利益 = 売上 - 広告費"""
                     return model_func(x, a, b, c) - x
-                
                 def roas_func(x, a, b, c):
-                    """ROAS (%) = (売上 / 広告費) * 100"""
                     return (model_func(x, a, b, c) / x) * 100
                 
-                # 1. モデルのパラメータ推定
+                # モデルのパラメータ推定
                 params, pcov = curve_fit(model_func, x_data, y_data, p0=p0, bounds=param_bounds)
                 a, b, c = params
                 perr = np.sqrt(np.diag(pcov))
@@ -249,17 +229,15 @@ if st.button("解析開始"):
                 r2 = 1 - ss_res / ss_tot
                 st.write(f"決定係数 R² = {r2:.3f}")
                 
-                # 2. 利益最大化の最適化
+                # 利益最大化の最適化
                 res_opt = minimize(lambda x: -profit_func(x, a, b, c),
                                    x0=initial_guess, method='L-BFGS-B', bounds=ad_bounds)
-                
                 if res_opt.success:
                     optimal_x = res_opt.x[0]
                     optimal_sales = model_func(optimal_x, a, b, c)
                     optimal_profit = profit_func(optimal_x, a, b, c)
                     optimal_roas = roas_func(optimal_x, a, b, c)
                     
-                    # 円 -> 万円 単位に変換
                     optimal_x_10k = optimal_x / 10000.0
                     optimal_sales_10k = optimal_sales / 10000.0
                     optimal_profit_10k = optimal_profit / 10000.0
@@ -272,22 +250,24 @@ if st.button("解析開始"):
                 else:
                     st.error("利益最大化の計算が収束しませんでした。")
                 
-                # 3. グラフ描画
+                # -------------------------------
+                # グラフ描画（最適表示用に調整）
+                # -------------------------------
                 x_plot = np.linspace(1, 500000, 300)
                 y_pred = model_func(x_plot, a, b, c)
                 profit_pred = profit_func(x_plot, a, b, c)
                 roas_pred = roas_func(x_plot, a, b, c)
                 
-                # 円 -> 万円 への変換（表示用）
+                # 単位変換（円→万円）
                 x_plot_10k = x_plot / 10000.0
                 y_pred_10k = y_pred / 10000.0
                 profit_pred_10k = profit_pred / 10000.0
                 x_data_10k = x_data / 10000.0
                 y_data_10k = y_data / 10000.0
-                optimal_x_10k = None if optimal_x is None else (optimal_x / 10000.0)
+                optimal_x_10k = optimal_x / 10000.0 if optimal_x is not None else None
                 
-                # matplotlib による描画
-                fig, axes = plt.subplots(1, 3, figsize=(21, 7))
+                # constrained_layout オプションを有効にしてグラフ作成
+                fig, axes = plt.subplots(1, 3, figsize=(21, 7), constrained_layout=True)
                 
                 # ① 広告費 vs 売上
                 axes[0].scatter(x_data_10k, y_data_10k, color='blue', label='Observed Data')
@@ -298,8 +278,6 @@ if st.button("解析開始"):
                 axes[0].set_xlabel('Ad Cost (×10k JPY)')
                 axes[0].set_ylabel('Sales (×10k JPY)')
                 axes[0].legend()
-                axes[0].set_xlim(0, max(x_plot_10k)*1.05)
-                axes[0].set_ylim(0, max(y_pred_10k)*1.1)
                 
                 # ② 広告費 vs 利益
                 axes[1].plot(x_plot_10k, profit_pred_10k, color='red', label='Predicted Profit')
@@ -309,8 +287,6 @@ if st.button("解析開始"):
                 axes[1].set_xlabel('Ad Cost (×10k JPY)')
                 axes[1].set_ylabel('Profit (×10k JPY)')
                 axes[1].legend()
-                axes[1].set_xlim(0, max(x_plot_10k)*1.05)
-                axes[1].set_ylim(0, max(profit_pred_10k)*1.1)
                 
                 # ③ 広告費 vs ROAS
                 axes[2].plot(x_plot_10k, roas_pred, color='red', label='Predicted ROAS')
@@ -320,11 +296,9 @@ if st.button("解析開始"):
                 axes[2].set_xlabel('Ad Cost (×10k JPY)')
                 axes[2].set_ylabel('ROAS (%)')
                 axes[2].legend()
-                axes[2].set_xlim(0, max(x_plot_10k)*1.05)
-                axes[2].set_ylim(0, max(roas_pred)*1.1)
                 
-                plt.tight_layout()
-                st.pyplot(fig)
+                # st.pyplot に use_container_width オプションを付加
+                st.pyplot(fig, use_container_width=True)
             
     except Exception as e:
         st.error(f"エラーが発生しました: {e}")
