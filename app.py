@@ -69,7 +69,7 @@ if st.button("解析開始"):
         if len(x_data) != len(y_data):
             st.error("エラー: 広告費と売上のデータ数が一致しません。")
         else:
-            # 入力データを表形式で表示
+            # 入力データを1つの表にまとめて表示
             df_input = pd.DataFrame({
                 "広告費 (円)": x_data,
                 "売上 (円)": y_data
@@ -81,10 +81,104 @@ if st.button("解析開始"):
             ad_bounds = [(1, 2_000_000)]
             initial_guess = 300000.0  # 広告費の初期値 (円)
             
-            # ※「全モデル比較」はこれまでのコード通り表形式出力となるので、
-            #    ここでは「単一モデル選択」の場合のグラフ描画部分のみを修正します。
-            if model_type != "全モデル比較":
-                # 各モデルごとの設定
+            # -------------------------------
+            # 「全モデル比較」の場合
+            # -------------------------------
+            if model_type == "全モデル比較":
+                models = {
+                    "対数関数": {
+                        "func": log_func,
+                        "p0": [500, 1e-4, 500],
+                        "bounds": ((1, 1e-7, 0), (1e6, 1, 1e7))
+                    },
+                    "二次関数": {
+                        "func": quad_func,
+                        "p0": [-1e-5, 3, 400000],
+                        "bounds": ((-1e-4, -100, 0), (0, 10, 1e7))
+                    },
+                    "シグモイド関数": {
+                        "func": sigmoid_func,
+                        "p0": [1e6, 1e-5, 200000],
+                        "bounds": ((1e5, 1e-8, 0), (1e7, 1e-3, 1e6))
+                    },
+                    "ゴンペルツ関数": {
+                        "func": gompertz_func,
+                        "p0": [1e6, 5, 1e-5],
+                        "bounds": ((1e5, 0, 1e-8), (1e7, 10, 1e-3))
+                    },
+                    "分数関数": {
+                        "func": frac_func,
+                        "p0": [1e6, 0, 100000],
+                        "bounds": ((1e5, -1e6, 1), (1e7, 1e6, 1e7))
+                    }
+                }
+                
+                results = []
+                for name, setting in models.items():
+                    model_func = setting["func"]
+                    p0 = setting["p0"]
+                    param_bounds = setting["bounds"]
+                    
+                    try:
+                        # モデルパラメータ推定
+                        params, pcov = curve_fit(model_func, x_data, y_data, p0=p0, bounds=param_bounds)
+                        a, b, c = params
+                        
+                        # 決定係数 R² の計算
+                        y_model = model_func(x_data, a, b, c)
+                        residuals = y_data - y_model
+                        ss_res = np.sum(residuals**2)
+                        ss_tot = np.sum((y_data - np.mean(y_data))**2)
+                        r2 = 1 - ss_res / ss_tot
+                        
+                        # 利益・ROAS の定義
+                        profit_func = lambda x: model_func(x, a, b, c) - x
+                        roas_func = lambda x: (model_func(x, a, b, c) / x) * 100
+                        
+                        # 利益最大化の最適化
+                        res_opt = minimize(lambda x: -profit_func(x), x0=initial_guess, method='L-BFGS-B', bounds=ad_bounds)
+                        if res_opt.success:
+                            optimal_x = res_opt.x[0]
+                            optimal_sales = model_func(optimal_x, a, b, c)
+                            optimal_profit = profit_func(optimal_x)
+                            optimal_roas = roas_func(optimal_x)
+                        else:
+                            optimal_x = np.nan
+                            optimal_sales = np.nan
+                            optimal_profit = np.nan
+                            optimal_roas = np.nan
+                        
+                        # 円 -> 万円 への変換
+                        optimal_x_10k = optimal_x / 10000.0
+                        optimal_sales_10k = optimal_sales / 10000.0
+                        optimal_profit_10k = optimal_profit / 10000.0
+                        
+                        results.append({
+                            "モデル": name,
+                            "最適広告費 (万円)": np.round(optimal_x_10k, 2),
+                            "予測売上 (万円)": np.round(optimal_sales_10k, 2),
+                            "予測利益 (万円)": np.round(optimal_profit_10k, 2),
+                            "ROAS (%)": np.round(optimal_roas, 2),
+                            "決定係数": np.round(r2, 3)
+                        })
+                    except Exception as e:
+                        results.append({
+                            "モデル": name,
+                            "最適広告費 (万円)": "計算エラー",
+                            "予測売上 (万円)": "計算エラー",
+                            "予測利益 (万円)": "計算エラー",
+                            "ROAS (%)": "計算エラー",
+                            "決定係数": "計算エラー"
+                        })
+                
+                df_results = pd.DataFrame(results)
+                st.subheader("全モデル比較結果")
+                st.table(df_results)
+            
+            # -------------------------------
+            # 単一モデル選択の場合
+            # -------------------------------
+            else:
                 if model_type == "対数関数":
                     model_func   = log_func
                     model_name   = "対数関数モデル"
@@ -162,14 +256,13 @@ if st.button("解析開始"):
                     st.write(f"予測ROAS: {optimal_roas:.2f} %")
                 
                 # -------------------------------
-                # グラフ描画（軸の下限を0に、かつ全てのプロット点が収まるよう自動調整）
+                # グラフ描画（ROASグラフは非表示、残り2種類を自動調整して表示）
                 # -------------------------------
                 x_plot = np.linspace(1, 500000, 300)
                 y_pred = model_func(x_plot, a, b, c)
                 profit_pred = profit_func(x_plot, a, b, c)
-                roas_pred = roas_func(x_plot, a, b, c)
                 
-                # 単位変換（円 → 万円） ※ 広告費・売上・利益は万円単位
+                # 単位変換（円 → 万円）
                 x_plot_10k = x_plot / 10000.0
                 y_pred_10k = y_pred / 10000.0
                 profit_pred_10k = profit_pred / 10000.0
@@ -181,11 +274,11 @@ if st.button("解析開始"):
                     optimal_x_10k = None
                 
                 # 自動調整のため、各軸の最小・最大値を計算
-                # 広告費軸（x軸）
+                # x軸（広告費）の設定
                 x_all = np.concatenate([x_data_10k, x_plot_10k])
                 if optimal_x_10k is not None:
                     x_all = np.append(x_all, optimal_x_10k)
-                x_min = 0  # 0以下は意味がないので
+                x_min = 0
                 x_max = np.max(x_all) * 1.05
                 
                 # 売上軸（グラフ①）
@@ -195,11 +288,8 @@ if st.button("解析開始"):
                 # 利益軸（グラフ②）
                 profit_max = np.max(profit_pred_10k) * 1.1
                 
-                # ROAS軸（グラフ③）
-                roas_max = np.max(roas_pred) * 1.1
-                
-                # constrained_layout を有効にしてグラフ作成
-                fig, axes = plt.subplots(1, 3, figsize=(21, 7), constrained_layout=True)
+                # 2つのサブプロットでグラフ作成
+                fig, axes = plt.subplots(1, 2, figsize=(21, 7), constrained_layout=True)
                 
                 # ① 広告費 vs 売上
                 axes[0].scatter(x_data_10k, y_data_10k, color='blue', label='Observed Data')
@@ -224,18 +314,7 @@ if st.button("解析開始"):
                 axes[1].set_xlim(x_min, x_max)
                 axes[1].set_ylim(0, profit_max)
                 
-                # ③ 広告費 vs ROAS
-                axes[2].plot(x_plot_10k, roas_pred, color='red', label='Predicted ROAS')
-                if optimal_x_10k is not None:
-                    axes[2].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
-                axes[2].set_title('Ad Cost vs ROAS')
-                axes[2].set_xlabel('Ad Cost (×10k JPY)')
-                axes[2].set_ylabel('ROAS (%)')
-                axes[2].legend()
-                axes[2].set_xlim(x_min, x_max)
-                axes[2].set_ylim(0, roas_max)
-                
                 st.pyplot(fig, use_container_width=True)
-                
+            
     except Exception as e:
         st.error(f"エラーが発生しました: {e}")
