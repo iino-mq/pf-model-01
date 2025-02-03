@@ -77,26 +77,24 @@ st.set_page_config(page_title="広告費利益最大化予測", layout="wide")
 st.title("広告費と売上から利益最大化予測")
 st.markdown("""
 このアプリケーションは、広告費と売上のデータを基に、利益が最大となる広告費の予測を行います。  
-以下の7種類の選択肢からモデルを選べます：  
+以下の6種類の選択肢からモデルを選べます：  
 - 対数関数  
 - 二次関数  
 - シグモイド関数  
 - ゴンペルツ関数  
 - 分数関数  
-- 散布図  
 - 全モデル比較  
 
 **入力形式:**  
-- 一行のコンマ区切り：  
-  `100000,200000,300000,400000,...`  
+- 一行のコンマ区切り： `100000,200000,300000,...`  
 - または複数行の改行区切り：  
-どちらの形式にも対応しています。
+どちらにも対応しています。
 """)
 
 # -------------------------------
-# モデル選択の入力
+# モデル選択の入力（散布図は「全モデル比較」内で表示）
 # -------------------------------
-model_options = ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "散布図", "全モデル比較"]
+model_options = ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"]
 model_type = st.selectbox("モデル選択", model_options)
 
 # -------------------------------
@@ -173,11 +171,8 @@ if st.button("解析開始"):
                       })
               st.subheader("全モデル比較結果")
               st.table(pd.DataFrame(results))
-          
-          # －－－－－－－－－－－－－－－－－－
-          # 「散布図」の場合
-          # －－－－－－－－－－－－－－－－－－
-          elif model_type == "散布図":
+              
+              # さらに、全モデル比較結果の下部に散布図（広告費 vs 売上）を表示
               x_data_10k = x_data / 10000.0
               y_data_10k = y_data / 10000.0
               fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
@@ -236,18 +231,18 @@ if st.button("解析開始"):
                   st.write(f"予測利益: {optimal_profit / 10000:.2f} (万円)")
                   st.write(f"予測ROAS: {optimal_roas:.2f} %")
               
-              # グラフ描画：ここでは、x 軸の範囲を広告費探索範囲全体（1～10,000,000円）に設定
+              # グラフ描画：x 軸の範囲を広告費探索範囲全体（1～10,000,000円）に設定
               x_plot = np.linspace(1, ad_bounds[0][1], 300)
               y_plot = func(x_plot, a, b, c)
               profit_plot = profit_func(x_plot)
               
               # 単位変換（円 → 万円）
-              x_plot_10k = x_plot / 10000.0
-              y_plot_10k = y_plot / 10000.0
-              profit_plot_10k = profit_plot / 10000.0
-              x_data_10k = x_data / 10000.0
-              y_data_10k = y_data / 10000.0
-              optimal_x_10k = (optimal_x / 10000.0) if optimal_x is not None else None
+              x_plot_10k = x_plot / 10000
+              y_plot_10k = y_plot / 10000
+              profit_plot_10k = profit_plot / 10000
+              x_data_10k = x_data / 10000
+              y_data_10k = y_data / 10000
+              optimal_x_10k = (optimal_x / 10000) if optimal_x is not None else None
               
               # 自動軸調整
               x_all = np.concatenate([x_data_10k, x_plot_10k])
