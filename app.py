@@ -85,10 +85,10 @@ if st.button("解析開始"):
                 optimal_sales_10k = optimal_sales / 10000.0
                 optimal_profit_10k = optimal_profit / 10000.0
                 
-                st.subheader("利益最大化の結果 (単位: 10k JPY)")
-                st.write(f"最適な広告費: {optimal_x_10k:.2f} (×10k JPY)")
-                st.write(f"予測売上: {optimal_sales_10k:.2f} (×10k JPY)")
-                st.write(f"予測利益: {optimal_profit_10k:.2f} (×10k JPY)")
+                st.subheader("利益最大化の結果")
+                st.write(f"最適な広告費: {optimal_x_10k:.2f} (万円)")
+                st.write(f"予測売上: {optimal_sales_10k:.2f} (万円)")
+                st.write(f"予測利益: {optimal_profit_10k:.2f} (万円)")
                 st.write(f"予測ROAS: {optimal_roas:.2f} %")
             else:
                 st.error("利益最大化の計算が収束しませんでした。")
