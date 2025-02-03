@@ -34,12 +34,13 @@ st.set_page_config(page_title="広告費利益最大化予測", layout="wide")
 st.title("広告費と売上から利益最大化予測")
 st.markdown("""
 このアプリケーションは、広告費と売上のデータを基に、利益が最大となる広告費の予測を行います。  
-以下の6種類の選択肢からモデルを選べます：  
+以下の7種類の選択肢からモデルを選べます：  
 - 対数関数  
 - 二次関数  
 - シグモイド関数  
 - ゴンペルツ関数  
 - 分数関数  
+- 散布図  
 - 全モデル比較  
 
 **入力形式:** コンマで区切られたテキストを入力してください。  
@@ -49,7 +50,7 @@ st.markdown("""
 # モデル選択の入力
 # -------------------------------
 model_type = st.selectbox("モデル選択", 
-                          ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"])
+                          ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "散布図", "全モデル比較"])
 
 # -------------------------------
 # 入力データの入力 (デフォルト値あり)
@@ -176,7 +177,29 @@ if st.button("解析開始"):
                 st.table(df_results)
             
             # -------------------------------
-            # 単一モデル選択の場合
+            # 「散布図」の場合
+            # -------------------------------
+            elif model_type == "散布図":
+                # 単に入力データの散布図（広告費 vs 売上）を表示する
+                x_data_10k = x_data / 10000.0
+                y_data_10k = y_data / 10000.0
+                x_min = 0
+                x_max = np.max(x_data_10k) * 1.05
+                y_min = 0
+                y_max = np.max(y_data_10k) * 1.1
+
+                fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
+                ax.scatter(x_data_10k, y_data_10k, color='blue', label='Observed Data')
+                ax.set_title("散布図：広告費 vs 売上 (10k JPY)")
+                ax.set_xlabel("広告費 (×10k JPY)")
+                ax.set_ylabel("売上 (×10k JPY)")
+                ax.legend()
+                ax.set_xlim(x_min, x_max)
+                ax.set_ylim(y_min, y_max)
+                st.pyplot(fig, use_container_width=True)
+            
+            # -------------------------------
+            # 単一モデル選択の場合（対数関数、二次関数、シグモイド関数、ゴンペルツ関数、分数関数）
             # -------------------------------
             else:
                 if model_type == "対数関数":
@@ -256,7 +279,7 @@ if st.button("解析開始"):
                     st.write(f"予測ROAS: {optimal_roas:.2f} %")
                 
                 # -------------------------------
-                # グラフ描画（ROASグラフは非表示、残り2種類を自動調整して表示）
+                # グラフ描画（ROASグラフは非表示、残り2種類のグラフを自動調整して表示）
                 # -------------------------------
                 x_plot = np.linspace(1, 500000, 300)
                 y_pred = model_func(x_plot, a, b, c)
@@ -273,19 +296,16 @@ if st.button("解析開始"):
                 else:
                     optimal_x_10k = None
                 
-                # 自動調整のため、各軸の最小・最大値を計算
-                # x軸（広告費）の設定
+                # 各軸の最小・最大値を自動調整
                 x_all = np.concatenate([x_data_10k, x_plot_10k])
                 if optimal_x_10k is not None:
                     x_all = np.append(x_all, optimal_x_10k)
                 x_min = 0
                 x_max = np.max(x_all) * 1.05
                 
-                # 売上軸（グラフ①）
                 y_all_sales = np.concatenate([y_data_10k, y_pred_10k])
                 y_max_sales = np.max(y_all_sales) * 1.1
                 
-                # 利益軸（グラフ②）
                 profit_max = np.max(profit_pred_10k) * 1.1
                 
                 # 2つのサブプロットでグラフ作成
