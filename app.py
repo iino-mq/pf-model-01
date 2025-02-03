@@ -2,11 +2,11 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit, minimize
+import pandas as pd
 
 # -------------------------------
 # モデル関数の定義
 # -------------------------------
-
 def log_func(x, a, b, c):
     """対数関数モデル: 売上 = a * log(b * x) + c"""
     return a * np.log(b * x) + c
@@ -34,7 +34,7 @@ def gompertz_func(x, a, b, c):
 
 def frac_func(x, a, b, c):
     """分数関数モデル: 売上 = (a * x + b) / (x + c)  
-    ・a: xが大きいときの漸近値は a  
+    ・a: xが大きいときの漸近値  
     ・b: 分子の定数項  
     ・c: 分母のシフト（xが小さいときの影響を調整）
     """
@@ -47,19 +47,21 @@ st.set_page_config(page_title="広告費利益最大化予測", layout="wide")
 st.title("広告費と売上から利益最大化予測")
 st.markdown("""
 このアプリケーションは、広告費と売上のデータを基に、利益が最大となる広告費の予測を行います。  
-以下の5種類のモデルから選択できます：  
+以下の6種類の選択肢からモデルを選べます：  
 - 対数関数  
 - 二次関数  
 - シグモイド関数  
 - ゴンペルツ関数  
 - 分数関数  
+- 全モデル比較  
+
 **入力形式:** コンマで区切られたテキストを入力してください。  
 """)
 
 # -------------------------------
 # モデル選択の入力
 # -------------------------------
-model_type = st.selectbox("モデル選択", ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数"])
+model_type = st.selectbox("モデル選択", ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"])
 
 # -------------------------------
 # 入力データの入力 (デフォルト値あり)
@@ -83,155 +85,246 @@ if st.button("解析開始"):
             st.write("広告費 (円):", x_data)
             st.write("売上 (円):", y_data)
             
-            # -------------------------------
-            # モデルごとの設定
-            # -------------------------------
-            if model_type == "対数関数":
-                model_func   = log_func
-                model_name   = "対数関数モデル"
-                p0           = [500, 1e-4, 500]  
-                param_bounds = ((1, 1e-7, 0), (1e6, 1, 1e7))
-            elif model_type == "二次関数":
-                model_func   = quad_func
-                model_name   = "二次関数モデル"
-                p0           = [-1e-5, 3, 400000]  
-                param_bounds = ((-1e-4, -100, 0), (0, 10, 1e7))
-            elif model_type == "シグモイド関数":
-                model_func   = sigmoid_func
-                model_name   = "シグモイド関数モデル"
-                p0           = [1e6, 1e-5, 200000]  
-                param_bounds = ((1e5, 1e-8, 0), (1e7, 1e-3, 1e6))
-            elif model_type == "ゴンペルツ関数":
-                model_func   = gompertz_func
-                model_name   = "ゴンペルツ関数モデル"
-                p0           = [1e6, 5, 1e-5]  
-                param_bounds = ((1e5, 0, 1e-8), (1e7, 10, 1e-3))
-            elif model_type == "分数関数":
-                model_func   = frac_func
-                model_name   = "分数関数モデル"
-                p0           = [1e6, 0, 100000]  
-                param_bounds = ((1e5, -1e6, 1), (1e7, 1e6, 1e7))
-            else:
-                st.error("選択したモデルはサポートされていません。")
-                st.stop()
-            
-            # -------------------------------
-            # 利益・ROAS の計算（選択したモデルを利用）
-            # -------------------------------
-            def profit_func(x, a, b, c):
-                """利益 = 売上 - 広告費"""
-                return model_func(x, a, b, c) - x
-            
-            def roas_func(x, a, b, c):
-                """ROAS (%) = (売上 / 広告費) * 100"""
-                return (model_func(x, a, b, c) / x) * 100
-            
-            # -------------------------------
-            # 1. モデルのパラメータ推定
-            # -------------------------------
-            params, pcov = curve_fit(model_func, x_data, y_data, p0=p0, bounds=param_bounds)
-            a, b, c = params
-            perr = np.sqrt(np.diag(pcov))
-            
-            st.subheader("モデルパラメータ推定結果")
-            st.write(f"選択モデル: {model_name}")
-            st.write(f"a = {a:.3f} (std: {perr[0]:.3f})")
-            st.write(f"b = {b:.6f} (std: {perr[1]:.6f})")
-            st.write(f"c = {c:.3f} (std: {perr[2]:.3f})")
-            
-            # -------------------------------
-            # 決定係数 R² の計算
-            # -------------------------------
-            y_model = model_func(x_data, a, b, c)
-            residuals = y_data - y_model
-            ss_res = np.sum(residuals**2)
-            ss_tot = np.sum((y_data - np.mean(y_data))**2)
-            r2 = 1 - ss_res / ss_tot
-            st.write(f"決定係数 R² = {r2:.3f}")
-            
-            # -------------------------------
-            # 2. 利益最大化の最適化
-            # -------------------------------
+            # 広告費最適化の探索範囲
+            ad_bounds = [(1, 2_000_000)]
             initial_guess = 300000.0  # 広告費の初期値 (円)
-            ad_bounds = [(1, 2_000_000)]  # 探索範囲 (円)
-            res = minimize(lambda x: -profit_func(x, a, b, c),
-                           x0=initial_guess, method='L-BFGS-B', bounds=ad_bounds)
             
-            if res.success:
-                optimal_x = res.x[0]
-                optimal_sales = model_func(optimal_x, a, b, c)
-                optimal_profit = profit_func(optimal_x, a, b, c)
-                optimal_roas = roas_func(optimal_x, a, b, c)
+            # -------------------------------
+            # 「全モデル比較」の場合
+            # -------------------------------
+            if model_type == "全モデル比較":
+                # 各モデルの設定を辞書形式でまとめる
+                models = {
+                    "対数関数": {
+                        "func": log_func,
+                        "p0": [500, 1e-4, 500],
+                        "bounds": ((1, 1e-7, 0), (1e6, 1, 1e7))
+                    },
+                    "二次関数": {
+                        "func": quad_func,
+                        "p0": [-1e-5, 3, 400000],
+                        "bounds": ((-1e-4, -100, 0), (0, 10, 1e7))
+                    },
+                    "シグモイド関数": {
+                        "func": sigmoid_func,
+                        "p0": [1e6, 1e-5, 200000],
+                        "bounds": ((1e5, 1e-8, 0), (1e7, 1e-3, 1e6))
+                    },
+                    "ゴンペルツ関数": {
+                        "func": gompertz_func,
+                        "p0": [1e6, 5, 1e-5],
+                        "bounds": ((1e5, 0, 1e-8), (1e7, 10, 1e-3))
+                    },
+                    "分数関数": {
+                        "func": frac_func,
+                        "p0": [1e6, 0, 100000],
+                        "bounds": ((1e5, -1e6, 1), (1e7, 1e6, 1e7))
+                    }
+                }
                 
-                # 円 -> 万円 単位に変換
-                optimal_x_10k = optimal_x / 10000.0
-                optimal_sales_10k = optimal_sales / 10000.0
-                optimal_profit_10k = optimal_profit / 10000.0
+                results = []  # 結果を格納するリスト
                 
-                st.subheader("利益最大化の結果")
-                st.write(f"最適な広告費: {optimal_x_10k:.2f} (万円)")
-                st.write(f"予測売上: {optimal_sales_10k:.2f} (万円)")
-                st.write(f"予測利益: {optimal_profit_10k:.2f} (万円)")
-                st.write(f"予測ROAS: {optimal_roas:.2f} %")
+                for name, setting in models.items():
+                    model_func = setting["func"]
+                    p0 = setting["p0"]
+                    param_bounds = setting["bounds"]
+                    
+                    try:
+                        # モデルのパラメータ推定
+                        params, pcov = curve_fit(model_func, x_data, y_data, p0=p0, bounds=param_bounds)
+                        a, b, c = params
+                        perr = np.sqrt(np.diag(pcov))
+                        
+                        # 決定係数 R² の計算
+                        y_model = model_func(x_data, a, b, c)
+                        residuals = y_data - y_model
+                        ss_res = np.sum(residuals**2)
+                        ss_tot = np.sum((y_data - np.mean(y_data))**2)
+                        r2 = 1 - ss_res / ss_tot
+                        
+                        # 利益 = 売上 - 広告費 の定義
+                        profit_func = lambda x: model_func(x, a, b, c) - x
+                        roas_func = lambda x: (model_func(x, a, b, c) / x) * 100
+                        
+                        # 利益最大化の最適化
+                        res_opt = minimize(lambda x: -profit_func(x), x0=initial_guess, method='L-BFGS-B', bounds=ad_bounds)
+                        if res_opt.success:
+                            optimal_x = res_opt.x[0]
+                            optimal_sales = model_func(optimal_x, a, b, c)
+                            optimal_profit = profit_func(optimal_x)
+                            optimal_roas = roas_func(optimal_x)
+                        else:
+                            optimal_x = np.nan
+                            optimal_sales = np.nan
+                            optimal_profit = np.nan
+                            optimal_roas = np.nan
+                        
+                        # 円 -> 万円 への変換（表示用）
+                        optimal_x_10k = optimal_x / 10000.0
+                        optimal_sales_10k = optimal_sales / 10000.0
+                        optimal_profit_10k = optimal_profit / 10000.0
+                        
+                        results.append({
+                            "モデル": name,
+                            "最適広告費 (万円)": np.round(optimal_x_10k, 2),
+                            "予測売上 (万円)": np.round(optimal_sales_10k, 2),
+                            "予測利益 (万円)": np.round(optimal_profit_10k, 2),
+                            "ROAS (%)": np.round(optimal_roas, 2),
+                            "決定係数": np.round(r2, 3)
+                        })
+                    except Exception as e:
+                        results.append({
+                            "モデル": name,
+                            "最適広告費 (万円)": "計算エラー",
+                            "予測売上 (万円)": "計算エラー",
+                            "予測利益 (万円)": "計算エラー",
+                            "ROAS (%)": "計算エラー",
+                            "決定係数": "計算エラー"
+                        })
+                
+                # DataFrameに変換して表形式で出力
+                df_results = pd.DataFrame(results)
+                st.subheader("全モデル比較結果")
+                st.table(df_results)
+            
+            # -------------------------------
+            # 単一モデル選択の場合
+            # -------------------------------
             else:
-                st.error("利益最大化の計算が収束しませんでした。")
-                optimal_x = None
-            
-            # -------------------------------
-            # 3. グラフ描画
-            # -------------------------------
-            x_plot = np.linspace(1, 500000, 300)
-            y_pred = model_func(x_plot, a, b, c)
-            profit_pred = profit_func(x_plot, a, b, c)
-            roas_pred = roas_func(x_plot, a, b, c)
-            
-            # 円 -> 万円 への変換（表示用）
-            x_plot_10k = x_plot / 10000.0
-            y_pred_10k = y_pred / 10000.0
-            profit_pred_10k = profit_pred / 10000.0
-            x_data_10k = x_data / 10000.0
-            y_data_10k = y_data / 10000.0
-            optimal_x_10k = None if optimal_x is None else (optimal_x / 10000.0)
-            
-            # matplotlib による描画
-            fig, axes = plt.subplots(1, 3, figsize=(21, 7))
-            
-            # ① 広告費 vs 売上
-            axes[0].scatter(x_data_10k, y_data_10k, color='blue', label='Observed Data')
-            axes[0].plot(x_plot_10k, y_pred_10k, color='red', label=f'Fitted {model_name}')
-            if optimal_x_10k is not None:
-                axes[0].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
-            axes[0].set_title('Ad Cost vs Sales (10k JPY)')
-            axes[0].set_xlabel('Ad Cost (×10k JPY)')
-            axes[0].set_ylabel('Sales (×10k JPY)')
-            axes[0].legend()
-            axes[0].set_xlim(0, max(x_plot_10k)*1.05)
-            axes[0].set_ylim(0, max(y_pred_10k)*1.1)
-            
-            # ② 広告費 vs 利益
-            axes[1].plot(x_plot_10k, profit_pred_10k, color='red', label='Predicted Profit')
-            if optimal_x_10k is not None:
-                axes[1].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
-            axes[1].set_title('Ad Cost vs Profit (10k JPY)')
-            axes[1].set_xlabel('Ad Cost (×10k JPY)')
-            axes[1].set_ylabel('Profit (×10k JPY)')
-            axes[1].legend()
-            axes[1].set_xlim(0, max(x_plot_10k)*1.05)
-            axes[1].set_ylim(0, max(profit_pred_10k)*1.1)
-            
-            # ③ 広告費 vs ROAS
-            axes[2].plot(x_plot_10k, roas_pred, color='red', label='Predicted ROAS')
-            if optimal_x_10k is not None:
-                axes[2].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
-            axes[2].set_title('Ad Cost vs ROAS')
-            axes[2].set_xlabel('Ad Cost (×10k JPY)')
-            axes[2].set_ylabel('ROAS (%)')
-            axes[2].legend()
-            axes[2].set_xlim(0, max(x_plot_10k)*1.05)
-            axes[2].set_ylim(0, max(roas_pred)*1.1)
-            
-            plt.tight_layout()
-            st.pyplot(fig)
+                # モデルごとの設定（単一モデル用）
+                if model_type == "対数関数":
+                    model_func   = log_func
+                    model_name   = "対数関数モデル"
+                    p0           = [500, 1e-4, 500]  
+                    param_bounds = ((1, 1e-7, 0), (1e6, 1, 1e7))
+                elif model_type == "二次関数":
+                    model_func   = quad_func
+                    model_name   = "二次関数モデル"
+                    p0           = [-1e-5, 3, 400000]  
+                    param_bounds = ((-1e-4, -100, 0), (0, 10, 1e7))
+                elif model_type == "シグモイド関数":
+                    model_func   = sigmoid_func
+                    model_name   = "シグモイド関数モデル"
+                    p0           = [1e6, 1e-5, 200000]  
+                    param_bounds = ((1e5, 1e-8, 0), (1e7, 1e-3, 1e6))
+                elif model_type == "ゴンペルツ関数":
+                    model_func   = gompertz_func
+                    model_name   = "ゴンペルツ関数モデル"
+                    p0           = [1e6, 5, 1e-5]  
+                    param_bounds = ((1e5, 0, 1e-8), (1e7, 10, 1e-3))
+                elif model_type == "分数関数":
+                    model_func   = frac_func
+                    model_name   = "分数関数モデル"
+                    p0           = [1e6, 0, 100000]  
+                    param_bounds = ((1e5, -1e6, 1), (1e7, 1e6, 1e7))
+                else:
+                    st.error("選択したモデルはサポートされていません。")
+                    st.stop()
+                
+                # 利益・ROAS の計算（選択したモデルを利用）
+                def profit_func(x, a, b, c):
+                    """利益 = 売上 - 広告費"""
+                    return model_func(x, a, b, c) - x
+                
+                def roas_func(x, a, b, c):
+                    """ROAS (%) = (売上 / 広告費) * 100"""
+                    return (model_func(x, a, b, c) / x) * 100
+                
+                # 1. モデルのパラメータ推定
+                params, pcov = curve_fit(model_func, x_data, y_data, p0=p0, bounds=param_bounds)
+                a, b, c = params
+                perr = np.sqrt(np.diag(pcov))
+                
+                st.subheader("モデルパラメータ推定結果")
+                st.write(f"選択モデル: {model_name}")
+                st.write(f"a = {a:.3f} (std: {perr[0]:.3f})")
+                st.write(f"b = {b:.6f} (std: {perr[1]:.6f})")
+                st.write(f"c = {c:.3f} (std: {perr[2]:.3f})")
+                
+                # 決定係数 R² の計算
+                y_model = model_func(x_data, a, b, c)
+                residuals = y_data - y_model
+                ss_res = np.sum(residuals**2)
+                ss_tot = np.sum((y_data - np.mean(y_data))**2)
+                r2 = 1 - ss_res / ss_tot
+                st.write(f"決定係数 R² = {r2:.3f}")
+                
+                # 2. 利益最大化の最適化
+                res_opt = minimize(lambda x: -profit_func(x, a, b, c),
+                                   x0=initial_guess, method='L-BFGS-B', bounds=ad_bounds)
+                
+                if res_opt.success:
+                    optimal_x = res_opt.x[0]
+                    optimal_sales = model_func(optimal_x, a, b, c)
+                    optimal_profit = profit_func(optimal_x, a, b, c)
+                    optimal_roas = roas_func(optimal_x, a, b, c)
+                    
+                    # 円 -> 万円 単位に変換
+                    optimal_x_10k = optimal_x / 10000.0
+                    optimal_sales_10k = optimal_sales / 10000.0
+                    optimal_profit_10k = optimal_profit / 10000.0
+                    
+                    st.subheader("利益最大化の結果")
+                    st.write(f"最適な広告費: {optimal_x_10k:.2f} (万円)")
+                    st.write(f"予測売上: {optimal_sales_10k:.2f} (万円)")
+                    st.write(f"予測利益: {optimal_profit_10k:.2f} (万円)")
+                    st.write(f"予測ROAS: {optimal_roas:.2f} %")
+                else:
+                    st.error("利益最大化の計算が収束しませんでした。")
+                
+                # 3. グラフ描画
+                x_plot = np.linspace(1, 500000, 300)
+                y_pred = model_func(x_plot, a, b, c)
+                profit_pred = profit_func(x_plot, a, b, c)
+                roas_pred = roas_func(x_plot, a, b, c)
+                
+                # 円 -> 万円 への変換（表示用）
+                x_plot_10k = x_plot / 10000.0
+                y_pred_10k = y_pred / 10000.0
+                profit_pred_10k = profit_pred / 10000.0
+                x_data_10k = x_data / 10000.0
+                y_data_10k = y_data / 10000.0
+                optimal_x_10k = None if optimal_x is None else (optimal_x / 10000.0)
+                
+                # matplotlib による描画
+                fig, axes = plt.subplots(1, 3, figsize=(21, 7))
+                
+                # ① 広告費 vs 売上
+                axes[0].scatter(x_data_10k, y_data_10k, color='blue', label='Observed Data')
+                axes[0].plot(x_plot_10k, y_pred_10k, color='red', label=f'Fitted {model_name}')
+                if optimal_x_10k is not None:
+                    axes[0].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
+                axes[0].set_title('Ad Cost vs Sales (10k JPY)')
+                axes[0].set_xlabel('Ad Cost (×10k JPY)')
+                axes[0].set_ylabel('Sales (×10k JPY)')
+                axes[0].legend()
+                axes[0].set_xlim(0, max(x_plot_10k)*1.05)
+                axes[0].set_ylim(0, max(y_pred_10k)*1.1)
+                
+                # ② 広告費 vs 利益
+                axes[1].plot(x_plot_10k, profit_pred_10k, color='red', label='Predicted Profit')
+                if optimal_x_10k is not None:
+                    axes[1].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
+                axes[1].set_title('Ad Cost vs Profit (10k JPY)')
+                axes[1].set_xlabel('Ad Cost (×10k JPY)')
+                axes[1].set_ylabel('Profit (×10k JPY)')
+                axes[1].legend()
+                axes[1].set_xlim(0, max(x_plot_10k)*1.05)
+                axes[1].set_ylim(0, max(profit_pred_10k)*1.1)
+                
+                # ③ 広告費 vs ROAS
+                axes[2].plot(x_plot_10k, roas_pred, color='red', label='Predicted ROAS')
+                if optimal_x_10k is not None:
+                    axes[2].axvline(optimal_x_10k, color='green', linestyle='--', label='Optimal Ad Cost')
+                axes[2].set_title('Ad Cost vs ROAS')
+                axes[2].set_xlabel('Ad Cost (×10k JPY)')
+                axes[2].set_ylabel('ROAS (%)')
+                axes[2].legend()
+                axes[2].set_xlim(0, max(x_plot_10k)*1.05)
+                axes[2].set_ylim(0, max(roas_pred)*1.1)
+                
+                plt.tight_layout()
+                st.pyplot(fig)
             
     except Exception as e:
         st.error(f"エラーが発生しました: {e}")
