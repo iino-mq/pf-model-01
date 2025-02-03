@@ -5,11 +5,6 @@ from scipy.optimize import curve_fit, minimize
 import pandas as pd
 import re
 import warnings
-import matplotlib
-
-# 日本語フォントの設定（環境に合わせてフォント名を変更してください）
-matplotlib.rcParams["font.family"] = "IPAexGothic"  # 例：IPAexGothic
-matplotlib.rcParams["axes.unicode_minus"] = False    # 負の数のマイナス記号が文字化けしないように
 
 # 不要な警告を抑制
 warnings.filterwarnings("ignore")
@@ -75,8 +70,17 @@ model_settings = {
     }
 }
 
+# 英語表記用モデル名（グラフ用）
+model_names_en = {
+    "対数関数": "Logarithmic Model",
+    "二次関数": "Quadratic Model",
+    "シグモイド関数": "Sigmoid Model",
+    "ゴンペルツ関数": "Gompertz Model",
+    "分数関数": "Rational Model"
+}
+
 # -------------------------------
-# Streamlit 基本設定・タイトル
+# Streamlit 基本設定・タイトル（日本語）
 # -------------------------------
 st.set_page_config(page_title="広告費利益最大化予測", layout="wide")
 st.title("広告費と売上から利益最大化予測")
@@ -97,13 +101,13 @@ st.markdown("""
 """)
 
 # -------------------------------
-# モデル選択の入力（散布図は「全モデル比較」内で表示）
+# モデル選択の入力（散布図は全モデル比較内で表示）
 # -------------------------------
 model_options = ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"]
 model_type = st.selectbox("モデル選択", model_options)
 
 # -------------------------------
-# 入力データの入力 (デフォルト値あり)
+# 入力データの入力 (デフォルト値)
 # -------------------------------
 default_x = "100000,200000,300000"
 default_y = "400000,700000,900000"
@@ -122,7 +126,7 @@ if st.button("解析開始"):
       if len(x_data) != len(y_data) or len(x_data) == 0:
           st.error("エラー: 広告費と売上のデータ数が一致していないか、十分なデータがありません。")
       else:
-          # 入力データを表形式で表示
+          # 入力データを表形式で表示（日本語）
           df_input = pd.DataFrame({
               "広告費 (円)": x_data,
               "売上 (円)": y_data
@@ -134,9 +138,7 @@ if st.button("解析開始"):
           ad_bounds = [(1, 10_000_000)]  # 探索範囲：1円～10,000,000円
           initial_guess = 300000.0       # 初期値：300,000円
           
-          # －－－－－－－－－－－－－－－－－－
-          # 「全モデル比較」の場合
-          # －－－－－－－－－－－－－－－－－－
+          # -------------- 全モデル比較 の場合 --------------
           if model_type == "全モデル比較":
               results = []
               for name, setting in model_settings.items():
@@ -177,22 +179,20 @@ if st.button("解析開始"):
               st.subheader("全モデル比較結果")
               st.table(pd.DataFrame(results))
               
-              # さらに、全モデル比較結果の下部に散布図（広告費 vs 売上）を表示
+              # 全モデル比較結果の下部に散布図（Ad Cost vs Sales）を英語表記で表示
               x_data_10k = x_data / 10000.0
               y_data_10k = y_data / 10000.0
               fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
               ax.scatter(x_data_10k, y_data_10k, color="blue", label="Observed Data")
-              ax.set_title("散布図：広告費 vs 売上 (10k JPY)")
-              ax.set_xlabel("広告費 (×10k JPY)")
-              ax.set_ylabel("売上 (×10k JPY)")
+              ax.set_title("Scatter Plot: Ad Cost vs Sales (10k JPY)")
+              ax.set_xlabel("Ad Cost (×10k JPY)")
+              ax.set_ylabel("Sales (×10k JPY)")
               ax.legend()
               ax.set_xlim(0, np.max(x_data_10k) * 1.05)
               ax.set_ylim(0, np.max(y_data_10k) * 1.1)
               st.pyplot(fig, use_container_width=True)
           
-          # －－－－－－－－－－－－－－－－－－
-          # 単一モデル選択の場合
-          # －－－－－－－－－－－－－－－－－－
+          # -------------- 単一モデル選択 の場合 --------------
           else:
               if model_type in model_settings:
                   setting = model_settings[model_type]
@@ -217,7 +217,6 @@ if st.button("解析開始"):
               st.write(f"c = {c:.3f} (std: {perr[2]:.3f})")
               st.write(f"決定係数 R² = {r2:.3f}")
               
-              # 利益最大化の最適化
               profit_func = lambda x: func(x, a, b, c) - x
               res = minimize(lambda x: -profit_func(x), x0=initial_guess, method="L-BFGS-B", bounds=ad_bounds)
               if res.success:
@@ -231,9 +230,9 @@ if st.button("解析開始"):
               
               if optimal_x is not None:
                   st.subheader("利益最大化の結果")
-                  st.write(f"最適な広告費: {optimal_x / 10000:.2f} (万円)")
-                  st.write(f"予測売上: {optimal_sales / 10000:.2f} (万円)")
-                  st.write(f"予測利益: {optimal_profit / 10000:.2f} (万円)")
+                  st.write(f"最適な広告費: {optimal_x / 10000:.2f} (10k JPY)")
+                  st.write(f"予測売上: {optimal_sales / 10000:.2f} (10k JPY)")
+                  st.write(f"予測利益: {optimal_profit / 10000:.2f} (10k JPY)")
                   st.write(f"予測ROAS: {optimal_roas:.2f} %")
               
               # グラフ描画：x 軸の範囲を広告費探索範囲全体（1～10,000,000円）に設定
@@ -264,9 +263,10 @@ if st.button("解析開始"):
               # 2つのサブプロットでグラフ作成（広告費 vs 売上 と 広告費 vs 利益）
               fig, axes = plt.subplots(1, 2, figsize=(21, 7), constrained_layout=True)
               
-              # 広告費 vs 売上
+              # Ad Cost vs Sales のグラフ（英語表記）
               axes[0].scatter(x_data_10k, y_data_10k, color="blue", label="Observed Data")
-              axes[0].plot(x_plot_10k, y_plot_10k, color="red", label=f"Fitted {model_type}")
+              fitted_label = f"Fitted {model_names_en.get(model_type, model_type)}"
+              axes[0].plot(x_plot_10k, y_plot_10k, color="red", label=fitted_label)
               if optimal_x_10k is not None:
                   axes[0].axvline(optimal_x_10k, color="green", linestyle="--", label="Optimal Ad Cost")
               axes[0].set_title("Ad Cost vs Sales (10k JPY)")
@@ -276,7 +276,7 @@ if st.button("解析開始"):
               axes[0].set_xlim(x_min, x_max)
               axes[0].set_ylim(0, y_max_sales)
               
-              # 広告費 vs 利益
+              # Ad Cost vs Profit のグラフ（英語表記）
               axes[1].plot(x_plot_10k, profit_plot_10k, color="red", label="Predicted Profit")
               if optimal_x_10k is not None:
                   axes[1].axvline(optimal_x_10k, color="green", linestyle="--", label="Optimal Ad Cost")
