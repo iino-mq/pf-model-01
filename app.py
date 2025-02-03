@@ -65,6 +65,16 @@ if st.button("解析開始"):
             st.write(f"c = {c:.3f} (std: {perr[2]:.3f})")
             
             # -------------------------------
+            # 追加: 決定係数 R² の計算と表示
+            # -------------------------------
+            y_model = log_func(x_data, a, b, c)
+            residuals = y_data - y_model
+            ss_res = np.sum(residuals**2)
+            ss_tot = np.sum((y_data - np.mean(y_data))**2)
+            r2 = 1 - ss_res / ss_tot
+            st.write(f"決定係数 R² = {r2:.3f}")
+            
+            # -------------------------------
             # 2. 利益最大化の最適化
             # -------------------------------
             initial_guess = 300000.0  # 広告費の初期値 (円)
@@ -78,7 +88,7 @@ if st.button("解析開始"):
                 optimal_profit = profit_func(optimal_x, a, b, c)  # 予測利益 (円)
                 optimal_roas = roas_func(optimal_x, a, b, c)      # 予測ROAS (%)
                 
-                # 円 -> 万円 (10k円) 単位に変換
+                # 円 -> 万円 単位に変換
                 optimal_x_10k = optimal_x / 10000.0
                 optimal_sales_10k = optimal_sales / 10000.0
                 optimal_profit_10k = optimal_profit / 10000.0
@@ -93,7 +103,7 @@ if st.button("解析開始"):
                 optimal_x = None  # 最適解なし
             
             # -------------------------------
-            # 3. Graph Drawing (with English labels)
+            # 3. グラフ描画 (英語表記)
             # -------------------------------
             # 描画用 x 軸の範囲 (円単位)
             x_plot = np.linspace(1, 500000, 300)
