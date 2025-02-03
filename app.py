@@ -6,13 +6,31 @@ from scipy.optimize import curve_fit, minimize
 # -------------------------------
 # モデル関数の定義
 # -------------------------------
+
 def log_func(x, a, b, c):
     """対数関数モデル: 売上 = a * log(b * x) + c"""
     return a * np.log(b * x) + c
 
-def exp_sat_func(x, a, b, c):
-    """指数関数的飽和モデル: 売上 = a * (1 - exp(-b * x)) + c"""
-    return a * (1 - np.exp(-b * x)) + c
+def quad_func(x, a, b, c):
+    """二次関数モデル: 売上 = a * x^2 + b * x + c  
+    ※ 広告費増加により飽和（あるいは下落）することを期待する場合、aは負の値となる設定にしています。  
+    """
+    return a * x**2 + b * x + c
+
+def sigmoid_func(x, a, b, c):
+    """シグモイド関数モデル: 売上 = a / (1 + exp(-b*(x - c)))  
+    ・a : 上限（最大売上）  
+    ・b : 成長の速さ  
+    ・c : 転換点（x軸上の中央値）  
+    """
+    return a / (1 + np.exp(-b * (x - c)))
+
+def gompertz_func(x, a, b, c):
+    """ゴンペルツ関数モデル: 売上 = a * exp(-b * exp(-c * x))  
+    ・a : 上限（最大売上）  
+    ・b, c : 形状を決めるパラメータ
+    """
+    return a * np.exp(-b * np.exp(-c * x))
 
 # -------------------------------
 # Streamlit の基本設定・タイトル
@@ -21,13 +39,18 @@ st.set_page_config(page_title="広告費利益最大化予測", layout="wide")
 st.title("広告費と売上から利益最大化予測")
 st.markdown("""
 このアプリケーションは、広告費と売上のデータを基に、利益が最大となる広告費の予測を行います。  
+以下の4種類のモデルから選択できます：  
+- 対数関数  
+- 二次関数  
+- シグモイド関数  
+- ゴンペルツ関数  
 **入力形式:** コンマで区切られたテキストを入力してください。  
 """)
 
 # -------------------------------
 # モデル選択の入力
 # -------------------------------
-model_type = st.selectbox("モデル選択", ["対数関数", "指数関数"])
+model_type = st.selectbox("モデル選択", ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数"])
 
 # -------------------------------
 # 入力データの入力 (デフォルト値あり)
@@ -52,18 +75,33 @@ if st.button("解析開始"):
             st.write("売上 (円):", y_data)
             
             # -------------------------------
-            # 選択したモデルに応じた関数・初期値・パラメータ範囲の設定
+            # モデルごとの設定
             # -------------------------------
             if model_type == "対数関数":
-                model_func = log_func
-                model_name = "対数関数モデル"
-                p0 = [500, 1e-4, 500]  # 初期値
+                model_func   = log_func
+                model_name   = "対数関数モデル"
+                p0           = [500, 1e-4, 500]  
                 param_bounds = ((1, 1e-7, 0), (1e6, 1, 1e7))
-            else:  # "指数関数"が選択された場合
-                model_func = exp_sat_func
-                model_name = "指数関数モデル"
-                p0 = [1e6, 1e-5, 500]  
-                param_bounds = ((1, 1e-8, 0), (1e8, 1, 1e7))
+            elif model_type == "二次関数":
+                model_func   = quad_func
+                model_name   = "二次関数モデル"
+                # ※ 広告費が大きい場合を考慮し、aは小さく負の値、bは適度な大きさ、cはオフセットとして設定
+                p0           = [-1e-5, 3, 400000]  
+                # 二次関数が上に凸にならないよう、aは負の範囲に制限
+                param_bounds = ((-1e-4, -100, 0), (0, 10, 1e7))
+            elif model_type == "シグモイド関数":
+                model_func   = sigmoid_func
+                model_name   = "シグモイド関数モデル"
+                p0           = [1e6, 1e-5, 200000]  
+                param_bounds = ((1e5, 1e-8, 0), (1e7, 1e-3, 1e6))
+            elif model_type == "ゴンペルツ関数":
+                model_func   = gompertz_func
+                model_name   = "ゴンペルツ関数モデル"
+                p0           = [1e6, 5, 1e-5]  
+                param_bounds = ((1e5, 0, 1e-8), (1e7, 10, 1e-3))
+            else:
+                st.error("選択したモデルはサポートされていません。")
+                st.stop()
             
             # -------------------------------
             # 利益・ROAS の計算（選択したモデルを利用）
@@ -84,7 +122,7 @@ if st.button("解析開始"):
             perr = np.sqrt(np.diag(pcov))
             
             st.subheader("モデルパラメータ推定結果")
-            st.write(f"モデル: {model_name}")
+            st.write(f"選択モデル: {model_name}")
             st.write(f"a = {a:.3f} (std: {perr[0]:.3f})")
             st.write(f"b = {b:.6f} (std: {perr[1]:.6f})")
             st.write(f"c = {c:.3f} (std: {perr[2]:.3f})")
@@ -103,7 +141,7 @@ if st.button("解析開始"):
             # 2. 利益最大化の最適化
             # -------------------------------
             initial_guess = 300000.0  # 広告費の初期値 (円)
-            ad_bounds = [(1, 2_000_000)]  # 探索範囲
+            ad_bounds = [(1, 2_000_000)]  # 探索範囲 (円)
             res = minimize(lambda x: -profit_func(x, a, b, c),
                            x0=initial_guess, method='L-BFGS-B', bounds=ad_bounds)
             
@@ -135,7 +173,7 @@ if st.button("解析開始"):
             profit_pred = profit_func(x_plot, a, b, c)
             roas_pred = roas_func(x_plot, a, b, c)
             
-            # 円 -> 万円 への変換
+            # 円 -> 万円 への変換（表示用）
             x_plot_10k = x_plot / 10000.0
             y_pred_10k = y_pred / 10000.0
             profit_pred_10k = profit_pred / 10000.0
