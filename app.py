@@ -107,7 +107,7 @@ y_input = st.text_area("売上データ (円単位)", default_y, height=100)
 # -------------------------------
 if st.button("解析開始"):
     try:
-        # 入力文字列を数値リストに変換
+        # 入力文字列を数値配列に変換
         x_data = np.array([float(val.strip()) for val in x_input.split(",") if val.strip()])
         y_data = np.array([float(val.strip()) for val in y_input.split(",") if val.strip()])
         
@@ -141,7 +141,6 @@ if st.button("解析開始"):
                         y_fit = func(x_data, a, b, c)
                         r2 = compute_r2(y_data, y_fit)
                         profit_func = lambda x: func(x, a, b, c) - x
-                        # 利益最大化の最適化
                         res = minimize(lambda x: -profit_func(x), x0=initial_guess, method="L-BFGS-B", bounds=ad_bounds)
                         if res.success:
                             optimal_x = res.x[0]
@@ -150,7 +149,6 @@ if st.button("解析開始"):
                             optimal_roas = (func(optimal_x, a, b, c) / optimal_x) * 100
                         else:
                             optimal_x, optimal_sales, optimal_profit, optimal_roas = (np.nan, np.nan, np.nan, np.nan)
-                        
                         results.append({
                             "モデル": name,
                             "最適広告費 (万円)": np.round(optimal_x / 10000, 2),
@@ -200,7 +198,7 @@ if st.button("解析開始"):
                     st.error("選択したモデルはサポートされていません。")
                     st.stop()
                 
-                # モデルパラメータの推定
+                # モデルパラメータ推定
                 params, pcov = curve_fit(func, x_data, y_data, p0=p0, bounds=bounds)
                 a, b, c = params
                 perr = np.sqrt(np.diag(pcov))
@@ -233,12 +231,12 @@ if st.button("解析開始"):
                     st.write(f"予測利益: {optimal_profit / 10000:.2f} (万円)")
                     st.write(f"予測ROAS: {optimal_roas:.2f} %")
                 
-                # グラフ描画（ROASグラフは非表示：広告費 vs 売上 と 広告費 vs 利益 の2種類）
-                x_plot = np.linspace(1, 500000, 300)
+                # ここでグラフ描画用の x 軸の範囲を広告費探索範囲全体に変更（1円～10,000,000円）
+                x_plot = np.linspace(1, ad_bounds[0][1], 300)
                 y_plot = func(x_plot, a, b, c)
                 profit_plot = profit_func(x_plot)
                 
-                # 単位変換：円→万円
+                # 単位変換（円 → 万円）
                 x_plot_10k = x_plot / 10000
                 y_plot_10k = y_plot / 10000
                 profit_plot_10k = profit_plot / 10000
@@ -246,7 +244,7 @@ if st.button("解析開始"):
                 y_data_10k = y_data / 10000
                 optimal_x_10k = (optimal_x / 10000) if optimal_x is not None else None
                 
-                # 自動軸調整のための最小・最大値
+                # 自動軸調整
                 x_all = np.concatenate([x_data_10k, x_plot_10k])
                 if optimal_x_10k is not None:
                     x_all = np.append(x_all, optimal_x_10k)
@@ -258,7 +256,7 @@ if st.button("解析開始"):
                 
                 profit_max = np.max(profit_plot_10k) * 1.1
                 
-                # 2つのサブプロットでグラフ作成
+                # 2つのサブプロット（広告費 vs 売上 と 広告費 vs 利益）の描画
                 fig, axes = plt.subplots(1, 2, figsize=(21, 7), constrained_layout=True)
                 
                 # 広告費 vs 売上
