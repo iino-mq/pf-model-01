@@ -5,6 +5,7 @@ from scipy.optimize import curve_fit, minimize
 import pandas as pd
 import re
 import warnings
+from scipy.stats import spearmanr  # 追加
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -81,7 +82,7 @@ model_settings = {
     }
 }
 
-# English labels for graphs
+# English labels for graph legends
 model_names_en = {
     "対数関数": "Logarithmic Model",
     "二次関数": "Quadratic Model",
@@ -91,7 +92,7 @@ model_names_en = {
 }
 
 # -------------------------------
-# Streamlit Basic Settings & Title (Japanese for input/forms)
+# Streamlit Basic Settings & Title (Input forms in Japanese)
 # -------------------------------
 st.set_page_config(page_title="広告費利益最大化予測", layout="wide")
 st.title("広告費と売上から利益最大化予測")
@@ -112,13 +113,13 @@ st.markdown("""
 """)
 
 # -------------------------------
-# Model Selection Input (散布図は全モデル比較内で表示)
+# Model Selection Input (Scatter plot option removed)
 # -------------------------------
 model_options = ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"]
 model_type = st.selectbox("モデル選択", model_options)
 
 # -------------------------------
-# Data Input (Default values provided)
+# Data Input (Default values)
 # -------------------------------
 default_x = "100000,200000,300000"
 default_y = "400000,700000,900000"
@@ -193,12 +194,18 @@ if st.button("解析開始"):
               st.subheader("全モデル比較結果")
               st.table(pd.DataFrame(results))
               
-              # Display scatter plot (Ad Cost vs Sales) below the table (English labels for graph)
+              # Calculate Spearman's rank correlation coefficient for input data
+              rho, p_val = spearmanr(x_data, y_data)
+              spearman_text = f"Spearman's rho: {rho:.3f} (p = {p_val:.3f})"
+              
+              # Display scatter plot (Ad Cost vs Sales) with Spearman info above the plot
               x_data_10k = x_data / 10000.0
               y_data_10k = y_data / 10000.0
               fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
+              # Set a suptitle to include Spearman's rho
+              fig.suptitle(spearman_text, fontsize=14, y=0.98)
               ax.scatter(x_data_10k, y_data_10k, color="blue", label="Observed Data")
-              ax.set_title("Scatter Plot: Ad Cost vs Sales (10k JPY)")
+              ax.set_title("Scatter Plot: Ad Cost vs Sales (10k JPY)", fontsize=12)
               ax.set_xlabel("Ad Cost (×10k JPY)")
               ax.set_ylabel("Sales (×10k JPY)")
               ax.legend()
