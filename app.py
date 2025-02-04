@@ -5,7 +5,7 @@ from scipy.optimize import curve_fit, minimize
 import pandas as pd
 import re
 import warnings
-from scipy.stats import spearmanr  # 追加
+from scipy.stats import spearmanr  # Spearmanの順位相関係数計算用
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -119,7 +119,7 @@ model_options = ["対数関数", "二次関数", "シグモイド関数", "ゴ�
 model_type = st.selectbox("モデル選択", model_options)
 
 # -------------------------------
-# Data Input (Default values)
+# Data Input (Default values provided)
 # -------------------------------
 default_x = "100000,200000,300000"
 default_y = "400000,700000,900000"
@@ -196,16 +196,14 @@ if st.button("解析開始"):
               
               # Calculate Spearman's rank correlation coefficient for input data
               rho, p_val = spearmanr(x_data, y_data)
-              spearman_text = f"Spearman's rho: {rho:.3f} (p = {p_val:.3f})"
+              st.write(f"Spearman's rank correlation coefficient: {rho:.3f} (p = {p_val:.3f})")
               
-              # Display scatter plot (Ad Cost vs Sales) with Spearman info above the plot
+              # Display scatter plot (Ad Cost vs Sales) below the table (English labels for graph)
               x_data_10k = x_data / 10000.0
               y_data_10k = y_data / 10000.0
               fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
-              # Set a suptitle to include Spearman's rho
-              fig.suptitle(spearman_text, fontsize=14, y=0.98)
               ax.scatter(x_data_10k, y_data_10k, color="blue", label="Observed Data")
-              ax.set_title("Scatter Plot: Ad Cost vs Sales (10k JPY)", fontsize=12)
+              ax.set_title("Scatter Plot: Ad Cost vs Sales (10k JPY)")
               ax.set_xlabel("Ad Cost (×10k JPY)")
               ax.set_ylabel("Sales (×10k JPY)")
               ax.legend()
