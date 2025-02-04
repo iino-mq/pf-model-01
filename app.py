@@ -7,41 +7,41 @@ import re
 import warnings
 from scipy.stats import spearmanr  # Spearmanの順位相関係数計算用
 
-# Suppress warnings
+# 不要な警告を抑制
 warnings.filterwarnings("ignore")
 
 # -------------------------------
-# Model Functions
+# モデル関数の定義
 # -------------------------------
 def log_func(x, a, b, c):
-    """Logarithmic Model: Sales = a * log(b * x) + c"""
+    """対数関数モデル: 売上 = a * log(b * x) + c"""
     return a * np.log(b * x) + c
 
 def quad_func(x, a, b, c):
-    """Quadratic Model: Sales = a * x^2 + b * x + c"""
+    """二次関数モデル: 売上 = a * x^2 + b * x + c"""
     return a * x**2 + b * x + c
 
 def sigmoid_func(x, a, b, c):
-    """Sigmoid Model: Sales = a / (1 + exp(-b*(x - c)))"""
+    """シグモイド関数モデル: 売上 = a / (1 + exp(-b*(x - c)))"""
     return a / (1 + np.exp(-b * (x - c)))
 
 def gompertz_func(x, a, b, c):
-    """Gompertz Model: Sales = a * exp(-b * exp(-c * x))"""
+    """ゴンペルツ関数モデル: 売上 = a * exp(-b * exp(-c * x))"""
     return a * np.exp(-b * np.exp(-c * x))
 
 def frac_func(x, a, b, c):
-    """Rational Model: Sales = (a * x + b) / (x + c)"""
+    """分数関数モデル: 売上 = (a * x + b) / (x + c)"""
     return (a * x + b) / (x + c)
 
 def compute_r2(y_true, y_pred):
-    """Compute coefficient of determination (R²)"""
+    """決定係数 R² の計算"""
     residuals = y_true - y_pred
     ss_res = np.sum(residuals**2)
     ss_tot = np.sum((y_true - np.mean(y_true))**2)
     return 1 - ss_res / ss_tot if ss_tot != 0 else np.nan
 
 def get_fit_symbol(r2):
-    """Return fit symbol based on R² value"""
+    """決定係数に基づく当てはまりの評価（◎：0.8以上、◯：0.5以上、△：0.25以上、✗：0.25未満）"""
     if r2 >= 0.8:
         return "◎"
     elif r2 >= 0.5:
@@ -51,8 +51,21 @@ def get_fit_symbol(r2):
     else:
         return "✗"
 
+def get_correlation_strength(rho):
+    """スピアマンの順位相関係数に基づく相関の強さの評価"""
+    if rho >= 0.8:
+        return "強い"
+    elif rho >= 0.5:
+        return "やや強い"
+    elif rho >= 0.3:
+        return "やや弱い"
+    elif rho > 0:
+        return "非常に弱い"
+    else:
+        return "なし"
+
 # -------------------------------
-# Model Settings (Dictionary)
+# モデル設定（辞書形式）
 # -------------------------------
 model_settings = {
     "対数関数": {
@@ -82,7 +95,7 @@ model_settings = {
     }
 }
 
-# English labels for graph legends
+# グラフ上の凡例用に英語表記
 model_names_en = {
     "対数関数": "Logarithmic Model",
     "二次関数": "Quadratic Model",
@@ -92,7 +105,7 @@ model_names_en = {
 }
 
 # -------------------------------
-# Streamlit Basic Settings & Title (Input forms in Japanese)
+# Streamlit 基本設定・タイトル（入力フォーム等は日本語）
 # -------------------------------
 st.set_page_config(page_title="広告費利益最大化予測", layout="wide")
 st.title("広告費と売上から利益最大化予測")
@@ -113,13 +126,13 @@ st.markdown("""
 """)
 
 # -------------------------------
-# Model Selection Input (Scatter plot option removed)
+# モデル選択の入力（散布図選択は全モデル比較内で表示）
 # -------------------------------
 model_options = ["対数関数", "二次関数", "シグモイド関数", "ゴンペルツ関数", "分数関数", "全モデル比較"]
 model_type = st.selectbox("モデル選択", model_options)
 
 # -------------------------------
-# Data Input (Default values provided)
+# 入力データの入力（デフォルト値）
 # -------------------------------
 default_x = "100000,200000,300000"
 default_y = "400000,700000,900000"
@@ -127,18 +140,18 @@ x_input = st.text_area("広告費データ (円単位)", default_x, height=100)
 y_input = st.text_area("売上データ (円単位)", default_y, height=100)
 
 # -------------------------------
-# Analysis Button Handling
+# 解析開始ボタン押下時の処理
 # -------------------------------
 if st.button("解析開始"):
   try:
-      # Convert input strings to arrays (supporting comma and newline separated)
+      # 入力文字列をカンマまたは改行で分割して数値配列に変換
       x_data = np.array([float(val.strip()) for val in re.split(r'[\n,]+', x_input.strip()) if val.strip()])
       y_data = np.array([float(val.strip()) for val in re.split(r'[\n,]+', y_input.strip()) if val.strip()])
       
       if len(x_data) != len(y_data) or len(x_data) == 0:
           st.error("エラー: 広告費と売上のデータ数が一致していないか、十分なデータがありません。")
       else:
-          # Display input data as a table (Japanese)
+          # 入力データを表形式で表示（日本語）
           df_input = pd.DataFrame({
               "広告費 (円)": x_data,
               "売上 (円)": y_data
@@ -146,11 +159,11 @@ if st.button("解析開始"):
           st.subheader("入力データ")
           st.table(df_input)
           
-          # Ad cost optimization parameters
-          ad_bounds = [(1, 10_000_000)]  # Range: 1 to 10,000,000 JPY
-          initial_guess = 300000.0       # Initial guess: 300,000 JPY
+          # 広告費最適化のパラメータ
+          ad_bounds = [(1, 10_000_000)]  # 探索範囲：1円～10,000,000円
+          initial_guess = 300000.0       # 初期値：300,000円
           
-          # -------------- All Models Comparison --------------
+          # -------------- 全モデル比較の場合 --------------
           if model_type == "全モデル比較":
               results = []
               for name, setting in model_settings.items():
@@ -194,11 +207,12 @@ if st.button("解析開始"):
               st.subheader("全モデル比較結果")
               st.table(pd.DataFrame(results))
               
-              # Calculate Spearman's rank correlation coefficient for input data
+              # スピアマンの順位相関係数を計算し、テキストとして表示（日本語）
               rho, p_val = spearmanr(x_data, y_data)
-              st.write(f"Spearman's rank correlation coefficient: {rho:.3f} (p = {p_val:.3f})")
+              correlation_strength = get_correlation_strength(rho)
+              st.write(f"スピアマンの順位相関係数：{rho:.3f} (p = {p_val:.3f})（相関：{correlation_strength}）")
               
-              # Display scatter plot (Ad Cost vs Sales) below the table (English labels for graph)
+              # 全モデル比較結果の下部に散布図（Ad Cost vs Sales）を英語表記で表示
               x_data_10k = x_data / 10000.0
               y_data_10k = y_data / 10000.0
               fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
@@ -211,7 +225,7 @@ if st.button("解析開始"):
               ax.set_ylim(0, np.max(y_data_10k) * 1.1)
               st.pyplot(fig, use_container_width=True)
           
-          # -------------- Single Model Selection --------------
+          # -------------- 単一モデル選択の場合 --------------
           else:
               if model_type in model_settings:
                   setting = model_settings[model_type]
@@ -278,7 +292,7 @@ if st.button("解析開始"):
               
               fig, axes = plt.subplots(1, 2, figsize=(21, 7), constrained_layout=True)
               
-              # Ad Cost vs Sales plot (English labels)
+              # Ad Cost vs Sales plot (英語表記)
               axes[0].scatter(x_data_10k, y_data_10k, color="blue", label="Observed Data")
               fitted_label = f"Fitted {model_names_en.get(model_type, model_type)}"
               axes[0].plot(x_plot_10k, y_plot_10k, color="red", label=fitted_label)
@@ -291,7 +305,7 @@ if st.button("解析開始"):
               axes[0].set_xlim(x_min, x_max)
               axes[0].set_ylim(0, y_max_sales)
               
-              # Ad Cost vs Profit plot (English labels)
+              # Ad Cost vs Profit plot (英語表記)
               axes[1].plot(x_plot_10k, profit_plot_10k, color="red", label="Predicted Profit")
               if optimal_x_10k is not None:
                   axes[1].axvline(optimal_x_10k, color="green", linestyle="--", label="Optimal Ad Cost")
